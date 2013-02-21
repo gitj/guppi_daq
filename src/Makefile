@@ -12,7 +12,7 @@ THREAD_PROGS = test_net_thread guppi_daq guppi_daq_fold guppi_daq_server
 THREAD_OBJS  = guppi_net_thread.o guppi_rawdisk_thread.o \
 	       guppi_psrfits_thread.o guppi_fold_thread.o \
 	       guppi_vdif_thread.o guppi_null_thread.o
-LIBS = -L$(OPT64)/lib -lcfitsio -L$(PRESTO)/lib -lsla -lvdifio -lm -lpthread
+LIBS = -L$(OPT64)/lib -lcfitsio -L$(PRESTO)/lib -L. -lsla -lvdifio -lm -lpthread
 all: $(PROGS) $(THREAD_PROGS) guppi_daq psrfits_subband
 clean:
 	rm -f $(PROGS) $(THREAD_PROGS) psrfits.tgz *~ *.o test_psrfits_0*.fits

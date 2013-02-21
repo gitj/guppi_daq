@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
         {0,0,0,0}
     };
     int opt, opti;
-    p.port = 50000;
+    p.port = 60000;
     p.packet_size=8200; 
     while ((opt=getopt_long(argc,argv,"hp:",long_opts,&opti))!=-1) {
         switch (opt) {
@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 
     /* Default to bee2 if no hostname given */
     if (optind==argc) {
-        strcpy(p.sender, "bee2-10");
+        strcpy(p.sender, "192.168.3.50");
     } else {
         strcpy(p.sender, argv[optind]);
     }
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     printf("sock=%d\n", p.sock);
 
     int rv2;
-    unsigned long long packet_count=0, max_id=0, seq_num;
+    unsigned long long packet_count=0, max_id=0, seq_num,first_id;
     struct guppi_udp_packet packet;
     int first=1;
     signal(SIGINT, stop_running);
@@ -94,12 +94,13 @@ int main(int argc, char *argv[]) {
                     fprintf(stderr, "Unknown error = %d\n", rv2);
                 }
             } else {
+                seq_num = guppi_udp_packet_seq_num(&packet);
                 if (first) { 
                     printf("Receiving (packet_size=%d).\n", (int)p.packet_size);
+                    first_id = seq_num;
                     first=0;
                 } 
                 packet_count++;
-                seq_num = guppi_udp_packet_seq_num(&packet);
                 if (seq_num>max_id) { max_id=seq_num; }
             }
         } else if (rv==GUPPI_TIMEOUT) {
@@ -116,8 +117,8 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Received %lld packets, dropped %lld (%.3e)\n",
-            packet_count, max_id+1-packet_count, 
-            (double)(max_id+1-packet_count)/(double)(max_id+1));
+            packet_count, max_id-first_id-packet_count+1, 
+            (double)(max_id-first_id-packet_count+1)/(double)(max_id-first_id));
 
 
 

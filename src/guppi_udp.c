@@ -127,8 +127,23 @@ unsigned long long change_endian64(const unsigned long long *d) {
     return(tmp);
 }
 
+#define PACKET_SIZE_ORIG ((size_t)8208)
+#define PACKET_SIZE_SHORT ((size_t)544)
+#define PACKET_SIZE_1SFA ((size_t)8224)
+#define PACKET_SIZE_1SFA_OLD ((size_t)8160)
+#define PACKET_SIZE_FAST4K ((size_t)4128)
+#define PACKET_SIZE_VDIF ((size_t)1032)
+#define PACKET_SIZE_SIMPLE ((size_t)8200)
+
 unsigned long long guppi_udp_packet_seq_num(const struct guppi_udp_packet *p) {
-    return(change_endian64((unsigned long long *)(p->data)));
+    unsigned long long plen;
+    if (p->packet_size == PACKET_SIZE_SIMPLE) {
+        plen = change_endian64(&(((unsigned long long *)(p->data))[1024]));  
+        plen = ((plen & 0xFFFFFFFFFFL)>>13);
+        return plen;
+    }
+    else   
+        return(change_endian64((unsigned long long *)(p->data)));
 }
 
 unsigned long long guppi_vdif_packet_seq_num(const struct guppi_udp_packet *p,
@@ -144,12 +159,6 @@ unsigned long long guppi_vdif_packet_seq_num(const struct guppi_udp_packet *p,
     return seq;
 }
 
-#define PACKET_SIZE_ORIG ((size_t)8208)
-#define PACKET_SIZE_SHORT ((size_t)544)
-#define PACKET_SIZE_1SFA ((size_t)8224)
-#define PACKET_SIZE_1SFA_OLD ((size_t)8160)
-#define PACKET_SIZE_FAST4K ((size_t)4128)
-#define PACKET_SIZE_VDIF ((size_t)1032)
 
 size_t guppi_udp_packet_datasize(size_t packet_size) {
     /* Special case for the new "1SFA" packets, which have an extra
@@ -167,6 +176,8 @@ size_t guppi_udp_packet_datasize(size_t packet_size) {
         return((size_t)512);
     else if (packet_size==PACKET_SIZE_VDIF)
         return(packet_size - (size_t)VDIF_HEADER_BYTES);
+    else if (packet_size==PACKET_SIZE_SIMPLE)
+        return ((size_t)8192);
     else              
         return(packet_size - 2*sizeof(unsigned long long));
 }
@@ -174,6 +185,8 @@ size_t guppi_udp_packet_datasize(size_t packet_size) {
 char *guppi_udp_packet_data(const struct guppi_udp_packet *p) {
     if (p->packet_size==PACKET_SIZE_VDIF)
         return((char *)(p->data) + (size_t)VDIF_HEADER_BYTES);
+    else if (p->packet_size==PACKET_SIZE_SIMPLE)
+        return((char *)(p->data)); // simple packet format has 8 byte header at end of packet
     /* This is valid for all guppi packet formats */
     return((char *)(p->data) + sizeof(unsigned long long));
 }

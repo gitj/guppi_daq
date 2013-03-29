@@ -142,6 +142,10 @@ void guppi_read_net_params(char *buf, struct guppi_udp_params *u) {
         get_int("PKTSIZE", itmp, 1032);
         u->packet_size = itmp;
     }
+    else if (strncmp(u->packet_format, "SIMPLE", 6) == 0)
+    {
+    	u->packet_size = 8200;
+    }
     else
         u->packet_size = 8208;
 }

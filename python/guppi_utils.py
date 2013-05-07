@@ -44,8 +44,15 @@ def cardlist_from_string(str):
     return cardlist
 
 
-GUPPI_STATUS_KEY = 16783408
-GUPPI_STATUS_SEMID = "/guppi_status"
+#GUPPI_STATUS_KEY = 16783408
+#GUPPI_STATUS_SEMID = "/guppi_status"
+
+GUPPI_STATUS_KEY = 0x01ccddee
+GUPPI_STATUS_SEMID = "/csguppi_status"
+
+def unlock_status():
+    sem = possem.sem_open(GUPPI_STATUS_SEMID, possem.O_CREAT, 00644, 1)
+    return possem.sem_post(sem)
 
 class guppi_status:
 

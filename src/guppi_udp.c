@@ -107,6 +107,7 @@ int guppi_udp_wait(struct guppi_udp_params *p) {
 int guppi_udp_recv(struct guppi_udp_params *p, struct guppi_udp_packet *b) {
     int rv = recv(p->sock, b->data, GUPPI_MAX_PACKET_SIZE, 0);
     b->packet_size = rv;
+    b->nchan = p->nchan;
     if (rv==-1) { return(GUPPI_ERR_SYS); }
     else if (p->packet_size) {
         if (rv!=p->packet_size) { return(GUPPI_ERR_PACKET); }
@@ -139,7 +140,12 @@ unsigned long long guppi_udp_packet_seq_num(const struct guppi_udp_packet *p) {
     unsigned long long plen;
     if (p->packet_size == PACKET_SIZE_SIMPLE) {
         plen = change_endian64(&(((unsigned long long *)(p->data))[1024]));  
-        plen = ((plen & 0xFFFFFFFFFFL)>>13);
+        if (((plen & 0xFF00000000000000L) >>56) == 16) {
+        	plen = ((plen & 0xFFFFFFFFFFL)>>14);
+        }
+        else {
+        	plen = ((plen & 0xFFFFFFFFFFL)>>13);
+        }
         return plen;
     }
     else   
@@ -221,6 +227,28 @@ void guppi_udp_packet_data_copy(char *out, const struct guppi_udp_packet *p) {
                 spec_data_size);
         memset(out + pad + spec_data_size + pad
                 + pad + spec_data_size, 0, pad);
+    } else if (p->packet_size == PACKET_SIZE_SIMPLE) {
+    	/*
+    	 * SIMPLE packets are from the overlapping filterbank, which puts out pairs of time samples for each polarization for each channel.
+    	 * this copy deinterleaves the pairs of time samples to make it look like normal guppi data (polarization fastest, then channel, then time)
+    	 */
+    	int itime, ichan;
+    	char *in = guppi_udp_packet_data(p);
+    	int nchan = p->nchan;
+    	int ntime = 1024/nchan; // each 8k packet contains 1024 chunks of data. each chunk is 2 pols and 2 time samples for a given channel
+    	for (ichan=0; ichan<nchan; ichan++) {
+    		for (itime=0; itime<ntime; itime++) {
+    			out[0 + 4*(nchan*(2*itime+0)+ichan)] = in[2 + 8*(nchan*itime+ichan)]; // Pol0 copy the even time samples
+    			out[1 + 4*(nchan*(2*itime+0)+ichan)] = in[3 + 8*(nchan*itime+ichan)];
+    			out[2 + 4*(nchan*(2*itime+0)+ichan)] = in[6 + 8*(nchan*itime+ichan)]; // Pol1
+    			out[3 + 4*(nchan*(2*itime+0)+ichan)] = in[7 + 8*(nchan*itime+ichan)];
+
+    			out[0 + 4*(nchan*(2*itime+1)+ichan)] = in[0 + 8*(nchan*itime+ichan)]; // Pol0 copy the odd time samples
+    			out[1 + 4*(nchan*(2*itime+1)+ichan)] = in[1 + 8*(nchan*itime+ichan)];
+    			out[2 + 4*(nchan*(2*itime+1)+ichan)] = in[4 + 8*(nchan*itime+ichan)]; // Pol1
+    			out[3 + 4*(nchan*(2*itime+1)+ichan)] = in[5 + 8*(nchan*itime+ichan)];
+    		}
+    	}
     } else {
         /* Packet has full data, just do a memcpy */
         memcpy(out, guppi_udp_packet_data(p), 

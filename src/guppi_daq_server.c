@@ -27,7 +27,7 @@
 
 #include "guppi_thread_main.h"
 
-#define GUPPI_DAQ_CONTROL "/tmp/guppi_daq_control"
+#define GUPPI_DAQ_CONTROL "/tmp/csguppi_daq_control"
 
 void usage() {
     fprintf(stderr,
@@ -47,6 +47,7 @@ void *guppi_net_thread(void *args);
 void *guppi_vdif_thread(void *args);
 void *guppi_fold_thread(void *args);
 void *guppi_psrfits_thread(void *args);
+void *guppi_rawdisk_thread(void *args);
 void *guppi_null_thread(void *args);
 
 /* Useful thread functions */
@@ -85,7 +86,21 @@ void init_monitor_mode(struct guppi_thread_args *args, int *nthread) {
     *nthread = 2;
 }
 
+void init_raw_mode(struct guppi_thread_args *args, int *nthread) {
+    guppi_thread_args_init(&args[0]); // net
+    guppi_thread_args_init(&args[1]); // null
+    args[0].output_buffer = 1;
+    args[1].input_buffer = args[0].output_buffer;
+    *nthread = 2;
+}
+
 void init_vdif_mode(struct guppi_thread_args *args, int *nthread) {
+    guppi_thread_args_init(&args[0]);
+    args[0].output_buffer = 1;
+    *nthread = 1;
+}
+
+void init_only_net_mode(struct guppi_thread_args *args, int *nthread) {
     guppi_thread_args_init(&args[0]);
     args[0].output_buffer = 1;
     *nthread = 1;
@@ -111,6 +126,19 @@ void start_monitor_mode(struct guppi_thread_args *args, pthread_t *ids) {
     int rv;
     rv = pthread_create(&ids[0], NULL, guppi_net_thread, (void*)&args[0]);
     rv = pthread_create(&ids[1], NULL, guppi_null_thread, (void*)&args[1]);
+}
+
+void start_raw_mode(struct guppi_thread_args *args, pthread_t *ids) {
+    // TODO error checking...
+    int rv;
+    rv = pthread_create(&ids[0], NULL, guppi_net_thread, (void*)&args[0]);
+    rv = pthread_create(&ids[1], NULL, guppi_rawdisk_thread, (void*)&args[1]);
+}
+
+void start_only_net_mode(struct guppi_thread_args *args, pthread_t *ids) {
+    // TODO error checking...
+    int rv;
+    rv = pthread_create(&ids[0], NULL, guppi_net_thread, (void*)&args[0]);
 }
 
 void start_vdif_mode(struct guppi_thread_args *args, pthread_t *ids) {
@@ -200,10 +228,27 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    printf("clearing fifo\n");
+    int rv = 1;
+    while(rv){
+		rv = read(command_fifo, cmd, MAX_CMD_LEN-1);
+		if (rv==0) { continue; }
+		else if (rv<0) {
+			if (errno==EAGAIN) { continue; }
+			else { perror("read");  continue; }
+			printf("got negative rv, so continuing\n");
+			rv = 0;
+		}
+		else {
+			printf("read %d from fifo\n", rv);
+		}
+    }
+    printf("done clearing\n");
+
     /* Attach to shared memory buffers */
     struct guppi_status stat;
     struct guppi_databuf *dbuf_net=NULL, *dbuf_fold=NULL;
-    int rv = guppi_status_attach(&stat);
+    rv = guppi_status_attach(&stat);
     const int netbuf_id = 1;
     // XXX we don't need a foldbuf at VLA...
     //const int foldbuf_id = 2;
@@ -264,8 +309,8 @@ int main(int argc, char *argv[]) {
         ctmp = strchr(timestr, '\n');
         if (ctmp!=NULL) { *ctmp = '\0'; } else { timestr[0]='\0'; }
         guppi_status_lock(&stat);
-        hputs(stat.buf, "DAQPULSE", timestr);
-        hputs(stat.buf, "DAQSTATE", nthread_cur==0 ? "stopped" : "running");
+        hputs(stat.buf, "CSDAQPUL", timestr);
+        hputs(stat.buf, "CSDAQST", nthread_cur==0 ? "stopped" : "running");
         guppi_status_unlock(&stat);
 
         // Flush any status/error/etc for logfiles
@@ -344,8 +389,11 @@ int main(int argc, char *argv[]) {
                 printf("  obs_mode = %s\n", obs_mode);
 
                 // Clear out data bufs
+                printf("clearing net buf %d %d\n",(int)dbuf_net,(int)dbuf_fold);
                 guppi_databuf_clear(dbuf_net);
-                guppi_databuf_clear(dbuf_fold);
+                printf("clearing fold buf\n");
+                fflush(stdout);
+//                guppi_databuf_clear(dbuf_fold);
 
                 // Do it
                 run = 1;
@@ -364,7 +412,13 @@ int main(int argc, char *argv[]) {
                 } else if (strncasecmp(obs_mode, "VDIF", 5)==0) {
                     init_vdif_mode(args, &nthread_cur);
                     start_vdif_mode(args, thread_id);
-                } else {
+                } else if (strncasecmp(obs_mode, "RAW", 4)==0) {
+                    init_raw_mode(args, &nthread_cur);
+                    start_raw_mode(args, thread_id);
+                } else if (strncasecmp(obs_mode, "ONLYNET", 8)==0) {
+					init_only_net_mode(args, &nthread_cur);
+					start_only_net_mode(args, thread_id);
+				} else {
                     printf("  unrecognized obs_mode!\n");
                 }
 
@@ -378,6 +432,10 @@ int main(int argc, char *argv[]) {
             run = 0;
             stop_threads(args, thread_id, nthread_cur);
             nthread_cur = 0;
+            printf("clearing net buf %d\n",(int)dbuf_net);
+            guppi_databuf_clear(dbuf_net);
+            fflush(stdout);
+
         } 
         
         else {
@@ -393,7 +451,7 @@ int main(int argc, char *argv[]) {
     if (command_fifo>0) close(command_fifo);
 
     guppi_status_lock(&stat);
-    hputs(stat.buf, "DAQSTATE", "exiting");
+    hputs(stat.buf, "CSDAQST", "exiting");
     guppi_status_unlock(&stat);
 
     curtime = time(NULL);

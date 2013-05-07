@@ -156,6 +156,8 @@ void *guppi_net_thread(void *_args) {
     int block_size;
     struct guppi_udp_packet p, p0;
     size_t packet_data_size = guppi_udp_packet_datasize(up.packet_size); 
+    printf("Found packet size = %d", up.packet_size);
+    fflush(stdout);
     if (use_parkes_packets) 
         packet_data_size = parkes_udp_packet_datasize(up.packet_size);
     unsigned packets_per_block; 

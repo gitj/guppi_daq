@@ -103,8 +103,14 @@ void guppi_databuf_clear(struct guppi_databuf *d) {
     /* Zero out semaphores */
     union semun arg;
     arg.array = (unsigned short *)malloc(sizeof(unsigned short)*d->n_block);
+    printf("guppi_databuf_clear: n_block: %d, arg.array %d\n",d->n_block,(int)(arg.array));
+    fflush(stdout);
     memset(arg.array, 0, sizeof(unsigned short)*d->n_block);
+    printf("guppi_databuf_clear: memset ok semid %d\n",d->semid);
+	fflush(stdout);
     semctl(d->semid, 0, SETALL, arg);
+    printf("guppi_databuf_clear: semctrl ok\n");
+	fflush(stdout);
     free(arg.array);
 
     /* Clear all headers */
@@ -112,6 +118,8 @@ void guppi_databuf_clear(struct guppi_databuf *d) {
     for (i=0; i<d->n_block; i++) {
         guppi_fitsbuf_clear(guppi_databuf_header(d, i));
     }
+    printf("guppi_databuf_clear: fitsbuf_clear\n");
+	fflush(stdout);
 
 }
 

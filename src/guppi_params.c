@@ -127,6 +127,7 @@ void guppi_read_net_params(char *buf, struct guppi_udp_params *u) {
     get_str("DATAHOST", u->sender, 80, "bee2-10");
     get_int("DATAPORT", u->port, 50000);
     get_str("PKTFMT", u->packet_format, 32, "GUPPI");
+    get_int("OBSNCHAN",u->nchan,64);
     if (strncmp(u->packet_format, "PARKES", 6)==0)
         u->packet_size = 2056;
     else if (strncmp(u->packet_format, "1SFA", 4)==0)

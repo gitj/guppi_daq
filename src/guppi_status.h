@@ -11,8 +11,10 @@
 
 #include "guppi_params.h"
 
-#define GUPPI_STATUS_KEY 16783408
-#define GUPPI_STATUS_SEMID "/guppi_status"
+//#define GUPPI_STATUS_KEY 16783408
+//#define GUPPI_STATUS_SEMID "/guppi_status"
+#define GUPPI_STATUS_KEY 0x01ccddee
+#define GUPPI_STATUS_SEMID "/csguppi_status"
 #define GUPPI_STATUS_SIZE (2880*64) // FITS-style buffer
 #define GUPPI_STATUS_CARD 80 // Size of each FITS "card"
 

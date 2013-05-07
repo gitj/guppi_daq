@@ -21,6 +21,8 @@ struct guppi_udp_params {
     size_t packet_size;     /* Expected packet size, 0 = don't care */
     char packet_format[32]; /* Packet format */
 
+    int nchan;  // Number of channels, needed to deinterleave SIMPLE packets
+
     /* Derived from above: */
     int sock;                       /* Receive socket */
     struct addrinfo sender_addr;    /* Sender hostname/IP params */
@@ -42,6 +44,7 @@ struct guppi_udp_params {
  */
 struct guppi_udp_packet {
     size_t packet_size;  /* packet size, bytes */
+    int nchan;  // Number of channels, needed to deinterleave SIMPLE packets
     char data[GUPPI_MAX_PACKET_SIZE]; /* packet data */
 };
 unsigned long long guppi_udp_packet_seq_num(const struct guppi_udp_packet *p);
